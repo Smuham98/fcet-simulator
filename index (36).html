@@ -1,0 +1,775 @@
+<title>FCET Value Simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: lab-notebook instrument panel — inputs column beside live readouts, three stacked modules (stack economics, operating temperature, revenue goal) */
+:root{
+  --bg:#f3f4f6; --panel:#ffffff; --ink:#151a24; --muted:#5b6474; --line:#d9dde4;
+  --cobalt:#2643b8; --cobalt-soft:#e6eaf8; --ceria:#b08410; --ceria-soft:#f6efd9;
+  --slate:#8a93a5; --good:#1f7a4d; --good-soft:#e2f2e9; --bad:#b4372f; --bad-soft:#f8e4e2; --warn:#9a6a00;
+  --display:"Archivo",ui-sans-serif,system-ui,sans-serif;
+  --body:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1219; --panel:#171b25; --ink:#e7eaf0; --muted:#98a1b2; --line:#2a3040;
+  --cobalt:#7d93ff; --cobalt-soft:#1f2747; --ceria:#e2b94a; --ceria-soft:#3a3018;
+  --slate:#6b7489; --good:#5cc790; --good-soft:#173527; --bad:#f07b72; --bad-soft:#3d1e1c; --warn:#e6b450; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1219; --panel:#171b25; --ink:#e7eaf0; --muted:#98a1b2; --line:#2a3040;
+  --cobalt:#7d93ff; --cobalt-soft:#1f2747; --ceria:#e2b94a; --ceria-soft:#3a3018;
+  --slate:#6b7489; --good:#5cc790; --good-soft:#173527; --bad:#f07b72; --bad-soft:#3d1e1c; --warn:#e6b450; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:28px}
+header{display:grid;gap:10px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--display);font-stretch:80%;font-weight:800;font-size:clamp(30px,5vw,46px);line-height:1.02;margin:0;text-wrap:balance}
+h2{font-family:var(--display);font-stretch:85%;font-weight:700;font-size:24px;margin:0;text-wrap:balance}
+h3{font-family:var(--display);font-weight:600;font-size:15px;margin:0;letter-spacing:.01em}
+p{margin:0;max-width:68ch}
+.lede{color:var(--muted)}
+.banner{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px;color:var(--warn);border:1px dashed var(--warn);border-radius:6px;padding:10px 12px}
+.module{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:22px;display:grid;gap:20px;min-width:0}
+.mod-head{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:end}
+.grid{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:28px}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.inputs{display:grid;gap:14px;align-content:start}
+.group-label{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:4px;margin-top:6px}
+.field{display:grid;gap:4px}
+.field-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.field label{font-size:13.5px;font-weight:500}
+.val{font-family:var(--mono);font-size:13.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.field-sub{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.hint{font-size:12px;color:var(--muted)}
+.hint.goal{color:var(--ceria);font-weight:500}
+input[type=range]{width:100%;accent-color:var(--cobalt);margin:0}
+.check{display:flex;gap:8px;align-items:center;font-size:13.5px;font-weight:500;cursor:pointer;padding:8px 10px;border:1px solid var(--line);border-radius:6px}
+.check input{accent-color:var(--cobalt);width:16px;height:16px;margin:0}
+.tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;border-radius:3px;padding:1px 6px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
+.tag[data-s="estimate"]{color:var(--warn);border-color:var(--warn)}
+.tag[data-s="sourced"]{color:var(--good);border-color:var(--good)}
+.tag:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--cobalt);outline-offset:2px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{font:500 13px var(--body);padding:7px 12px;border:0;background:transparent;color:var(--ink);cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--cobalt);color:var(--panel)}
+.outputs{display:grid;gap:22px;align-content:start;min-width:0}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+@media (max-width:560px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--panel);padding:12px 14px;display:grid;gap:2px;align-content:start}
+.kpi .k{font-size:12px;color:var(--muted)}
+.kpi .v{font-family:var(--mono);font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}
+.kpi .s{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.kpi.hero .v{color:var(--cobalt)}
+.neg{color:var(--bad)!important}.pos{color:var(--good)!important}
+.chart-box{display:grid;gap:8px;min-width:0}
+.chart-box svg{width:100%;height:auto;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.note{font-size:12.5px;color:var(--muted);border-left:2px solid var(--line);padding-left:10px}
+.answers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:560px){.answers{grid-template-columns:minmax(0,1fr)}}
+.ans{border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:grid;gap:4px;align-content:start}
+.ans .q{font-size:12.5px;color:var(--muted)}
+.ans .a{font-size:14px}
+.ans .a b{font-family:var(--mono);font-weight:500}
+.cond-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.chip{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:3px;white-space:nowrap}
+.chip.met{background:var(--good-soft);color:var(--good)}
+.chip.gap{background:var(--ceria-soft);color:var(--warn)}
+.chip.no{background:var(--bad-soft);color:var(--bad)}
+select{font:500 14px var(--body);padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{font:500 13px var(--body);padding:8px 14px;border-radius:6px;border:1px solid var(--cobalt);background:transparent;color:var(--cobalt);cursor:pointer}
+.btn:hover{background:var(--cobalt-soft)}
+.coverage{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--muted)}
+.bar{width:120px;height:6px;background:var(--line);border-radius:3px;overflow:hidden;display:flex}
+.bar i{display:block;height:100%}
+textarea#copyfallback{width:100%;font:12px var(--mono);min-height:120px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px}
+.table-wrap{overflow-x:auto}
+table{border-collapse:collapse;font-size:13px;width:100%;min-width:520px}
+th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:500;color:var(--muted);font-size:12px}
+th.band{color:var(--ceria)}
+td{font-family:var(--mono)}
+td:first-child{font-family:var(--body)}
+tr.em td{font-weight:600;color:var(--cobalt)}
+tr.sub td:first-child{padding-left:20px;color:var(--muted)}
+table.heat{min-width:560px}
+table.heat td{text-align:center;font-size:12px;padding:7px 4px;border:1px solid var(--panel)}
+table.heat td.met{background:var(--good-soft);color:var(--good)}
+table.heat td.near{background:var(--ceria-soft);color:var(--warn)}
+table.heat td.miss{background:var(--bg);color:var(--muted)}
+table.heat td.here{outline:2px solid var(--cobalt);outline-offset:-2px}
+table.heat th{text-align:center}
+table.heat td:first-child,table.heat th:first-child{text-align:left;font-family:var(--body);background:transparent;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">FCET · Thin-film ceramic electrolytes · Internal demo v0.3</div>
+  <h1>FCET Value Simulator</h1>
+  <p class="lede">Move any input and every number recalculates. Module 1 shows what each stack and each kilowatt is worth to the manufacturer and to FCET. Module 2 shows the savings and profit from running stacks cooler, with 550–650 °C as the goal. Module 3 works backward from a revenue goal and the total addressable market to the conditions FCET would have to meet.</p>
+  <div class="banner"><b>Illustrative figures.</b> Every starting value is a placeholder, not an FCET forecast. Tag each input as you replace it with a real estimate or a sourced number.</div>
+</header>
+
+<!-- ================= MODULE 1 ================= -->
+<section class="module" aria-labelledby="econ-h">
+  <div class="mod-head">
+    <div style="display:grid;gap:4px">
+      <div class="eyebrow">Module 1</div>
+      <h2 id="econ-h">Stack economics</h2>
+    </div>
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="Scenario">
+        <button type="button" data-scn="conservative">Conservative</button>
+        <button type="button" data-scn="base" aria-pressed="true">Base</button>
+        <button type="button" data-scn="optimistic">Optimistic</button>
+      </div>
+      <div class="seg" role="group" aria-label="Revenue model">
+        <button type="button" data-model="service" aria-pressed="true">Coating service</button>
+        <button type="button" data-model="license">Licensing</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="inputs" id="econ-inputs"></div>
+
+    <div class="outputs">
+      <div class="kpis" id="kpis"></div>
+
+      <div class="chart-box">
+        <h3>Where each kilowatt of savings goes</h3>
+        <div id="kwChart"></div>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--slate)"></i>FCET cost to deliver</span>
+          <span><i class="sw" style="background:var(--cobalt)"></i>FCET margin</span>
+          <span><i class="sw" style="background:var(--good)"></i>Manufacturer keeps</span>
+          <span><i class="sw" style="background:var(--ceria)"></i>Competing approach</span>
+        </div>
+      </div>
+
+      <div class="chart-box">
+        <h3>Per kW, per stack, and per year</h3>
+        <div class="table-wrap"><table id="unitTable"></table></div>
+      </div>
+
+      <div class="chart-box">
+        <h3>Cumulative FCET cash position, first 6 years</h3>
+        <div id="cashChart"></div>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--cobalt)"></i>Cumulative cash after capex, qualification and fixed costs</span>
+          <span><i class="sw" style="background:var(--bad)"></i>Funding trough</span>
+        </div>
+      </div>
+
+      <div class="answers" id="answers"></div>
+
+      <div class="table-wrap"><table id="yearTable"></table></div>
+
+      <p class="note">Model scope: monthly cash flow with a qualification period (no revenue), a linear ramp to full volume, yield applied to FCET's variable cost, and fixed operating costs from month one. Excludes taxes, financing, working capital, price erosion and depreciation. The competing approach is whatever else the manufacturer could do for the same goal (an in-house thin-film process, a different supplier, or incremental tape-cast improvements), entered as its savings per kW.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= MODULE 2 ================= -->
+<section class="module" aria-labelledby="temp-h">
+  <div class="mod-head">
+    <div style="display:grid;gap:4px">
+      <div class="eyebrow">Module 2 · Goal 550–650 °C</div>
+      <h2 id="temp-h">Operating temperature</h2>
+    </div>
+    <div class="toolbar">
+      <label for="mat" class="hint">FCET film material</label>
+      <select id="mat">
+        <option value="ysz">8YSZ (yttria-stabilized zirconia)</option>
+        <option value="gdc">GDC10 (gadolinium-doped ceria)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="inputs" id="temp-inputs"></div>
+
+    <div class="outputs">
+      <div class="kpis" id="tkpis"></div>
+
+      <div class="chart-box">
+        <h3>Savings per kW from running cooler</h3>
+        <div id="sweepChart"></div>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--cobalt)"></i>Customer savings with FCET film</span>
+          <span><i class="sw" style="background:var(--slate)"></i>Same temperature with tape-cast electrolyte</span>
+          <span><i class="sw" style="background:var(--good)"></i>FCET revenue per kW from cooler stacks</span>
+          <span><i class="sw" style="background:var(--ceria-soft);border:1px solid var(--ceria)"></i>Goal band</span>
+        </div>
+      </div>
+
+      <div class="answers" id="tanswers"></div>
+
+      <div class="chart-box">
+        <h3>Savings and profit across the goal band</h3>
+        <div class="table-wrap"><table id="bandTable"></table></div>
+        <p class="hint">Assumes temperature savings are priced into FCET's share. Profit uses Module 1's volume, share, variable cost and fixed cost.</p>
+      </div>
+
+      <div class="kpis" id="pkpis"></div>
+      <div class="chart-box">
+        <h3>Electrolyte area-specific resistance vs temperature (log scale)</h3>
+        <div id="asrChart"></div>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--slate)"></i>Tape-cast thickness</span>
+          <span><i class="sw" style="background:var(--cobalt)"></i>FCET film</span>
+          <span><i class="sw" style="background:var(--bad)"></i>Electrode ASR</span>
+          <span><i class="sw" style="background:var(--ceria)"></i>0.15 Ω·cm² design target</span>
+        </div>
+      </div>
+
+      <p class="note">How the savings are built. Balance of plant scales with degrees removed. Interconnect and seal savings switch on once the stack runs at or below the threshold, where low-cost ferritic steel and simpler seals become usable. The power-density effect compares cell voltage at the chosen current density: the incumbent is a YSZ tape-cast cell at its own temperature, and a cooler cell with more resistance makes less power, so each kW costs more. Electrode ASR grows as the stack cools (Arrhenius, anchored at 600 °C) and becomes the main loss below about 600 °C, so the cathode has to be chosen for low temperature too. Stack-life value counts stack replacements avoided over the system's life. Electrolyte conductivity uses typical literature values (8YSZ ≈ 0.04 S/cm at 800 °C, Ea ≈ 1.0 eV; GDC10 ≈ 0.025 S/cm at 600 °C, Ea ≈ 0.7 eV), with 1.0 V at zero current. Not modeled: GDC electronic leakage, pinholes, gas crossover, interface resistance. Replace every anchor with FCET, PNNL or customer data before quoting.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= MODULE 3 ================= -->
+<section class="module" aria-labelledby="goal-h">
+  <div class="mod-head">
+    <div style="display:grid;gap:4px">
+      <div class="eyebrow">Module 3</div>
+      <h2 id="goal-h">Revenue goal and TAM</h2>
+    </div>
+    <div class="seg" role="group" aria-label="Goal type">
+      <button type="button" data-goal="revenue" aria-pressed="true">Revenue goal</button>
+      <button type="button" data-goal="net">Net profit goal</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="inputs">
+      <div id="goal-inputs" class="inputs"></div>
+      <p class="note">Each condition at right changes one lever and holds the others at Module 1 and 2 values. The grid below combines two levers at once.</p>
+    </div>
+
+    <div class="outputs">
+      <div class="kpis" id="gkpis"></div>
+
+      <div class="chart-box">
+        <h3>Conditions that would hit the goal</h3>
+        <div class="answers" id="conditions"></div>
+      </div>
+
+      <div class="chart-box">
+        <h3>Market share of TAM needed, by FCET's share of savings</h3>
+        <div id="reqChart"></div>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--slate)"></i>Savings at half the current $/kW</span>
+          <span><i class="sw" style="background:var(--cobalt)"></i>Savings at current $/kW</span>
+          <span><i class="sw" style="background:var(--good)"></i>Savings at 1.5× current $/kW</span>
+          <span><i class="sw" style="background:var(--ceria)"></i>Current market share</span>
+        </div>
+      </div>
+
+      <div class="chart-box">
+        <h3>Goal grid: market share × share of savings</h3>
+        <div class="table-wrap"><table class="heat" id="heat"></table></div>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--good-soft);border:1px solid var(--good)"></i>Meets goal</span>
+          <span><i class="sw" style="background:var(--ceria-soft);border:1px solid var(--warn)"></i>Within 50% of goal</span>
+          <span><i class="sw" style="border:2px solid var(--cobalt)"></i>Closest to current inputs</span>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn" type="button" id="copyBtn">Copy assumptions and results</button>
+        <div class="coverage" title="Share of evidence inputs tagged as estimate or sourced">
+          <span>Evidence coverage</span>
+          <span class="bar"><i id="covS" style="background:var(--good)"></i><i id="covE" style="background:var(--warn)"></i></span>
+          <span id="covTxt" class="val"></span>
+        </div>
+      </div>
+      <textarea id="copyfallback" hidden readonly aria-label="Copy this text"></textarea>
+    </div>
+  </div>
+</section>
+</div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+function num(v){return isFinite(v)?Math.round(v).toLocaleString("en-US"):"—"}
+function money(v){if(!isFinite(v))return "—";const a=Math.abs(v),s=v<0?"−":"";
+  if(a>=1e9)return s+"$"+(a/1e9).toFixed(2)+"B";
+  if(a>=1e6)return s+"$"+(a/1e6).toFixed(a>=1e7?1:2)+"M";
+  if(a>=1e4)return s+"$"+(a/1e3).toFixed(0)+"k";
+  if(a>=1e3)return s+"$"+(a/1e3).toFixed(1)+"k";
+  if(a>=100)return s+"$"+a.toFixed(0);return s+"$"+a.toFixed(2)}
+function kwm(v){const a=Math.abs(v);return (v<0?"−$":"$")+(a>=100?num(a):a.toFixed(2))+"/kW"}
+function pct(v,d=1){return isFinite(v)?(v*100).toFixed(d)+"%":"—"}
+function mw(kw){return kw>=1e6?(kw/1e6).toFixed(2)+" GW":kw>=1000?(kw/1000).toFixed(kw>=1e5?0:1)+" MW":num(kw)+" kW"}
+
+/* ---------- Inputs ---------- */
+const FIELDS=[
+ {g:"Stacks"},
+ {id:"stacks",label:"Stacks per year (customer)",min:100,max:50000,step:100,fmt:v=>num(v)+" stacks",hint:"At full adoption"},
+ {id:"kw",label:"Rated power per stack",min:1,max:250,step:1,fmt:v=>v+" kW",hint:"Use the unit the customer sells"},
+ {id:"cost",label:"Baseline stack cost",min:200,max:5000,step:50,fmt:v=>"$"+num(v)+"/kW",hint:"Customer's current cost per kW"},
+ {g:"Savings per kW"},
+ {id:"sav",label:"Direct savings from FCET film",min:0,max:500,step:5,fmt:v=>"$"+v+"/kW",hint:"Material and processing, before temperature"},
+ {type:"check",id:"link",label:"Add temperature savings from Module 2"},
+ {id:"comp",label:"Savings with competing approach",min:0,max:1000,step:5,fmt:v=>"$"+v+"/kW",hint:"Best alternative open to the customer"},
+ {g:"FCET pricing and cost"},
+ {id:"share",label:"FCET share of customer savings",min:5,max:60,step:1,fmt:v=>v+"%",hint:"Price or royalty as a share of value"},
+ {id:"var",label:"FCET variable cost",min:0,max:100,step:0.5,fmt:v=>"$"+v.toFixed(2)+"/kW",hint:"Precursors, energy, labor",only:"service"},
+ {id:"yield",label:"Coating yield",min:50,max:99,step:1,fmt:v=>v+"%",hint:"Share of coated cells passing QC",only:"service"},
+ {id:"fee",label:"Upfront license fee",min:0,max:2000000,step:25000,fmt:v=>money(v),hint:"Paid at signing after qualification",only:"license"},
+ {g:"Investment and timing"},
+ {id:"capex",label:"Production equipment (capex)",min:0,max:5000000,step:50000,fmt:v=>money(v),hint:"Deposition line, furnaces, QC",only:"service"},
+ {id:"qual",label:"Customer qualification cost",min:0,max:2000000,step:25000,fmt:v=>money(v),hint:"Samples, stack tests, durability"},
+ {id:"qm",label:"Qualification period",min:3,max:48,step:1,fmt:v=>v+" months",hint:"Before the first paid volume"},
+ {id:"ramp",label:"Ramp to full volume",min:0,max:4,step:0.5,fmt:v=>v+" yr",hint:"Linear adoption after qualification"},
+ {id:"fixed",label:"FCET fixed operating cost",min:0,max:3000000,step:25000,fmt:v=>money(v)+"/yr",hint:"Staff, facility, IP"},
+];
+const TF=[
+ {g:"Operating temperature"},
+ {id:"T",label:"Target operating temperature",min:450,max:850,step:10,fmt:v=>v+" °C",hint:"Goal: 550–650 °C",goal:true,notag:true},
+ {id:"baseT",label:"Conventional stack temperature",min:700,max:900,step:10,fmt:v=>v+" °C",hint:"Incumbent YSZ tape-cast cell"},
+ {id:"j",label:"Current density",min:0.1,max:1.5,step:0.05,fmt:v=>v.toFixed(2)+" A/cm²",hint:"Ohmic loss = current × ASR"},
+ {g:"Electrolyte"},
+ {id:"tc",label:"Tape-cast electrolyte thickness",min:5,max:30,step:1,fmt:v=>v+" µm",hint:"Typical ≈ 10 µm"},
+ {id:"tf",label:"FCET film thickness",min:0.2,max:5,step:0.1,fmt:v=>v.toFixed(1)+" µm",hint:"PNNL reports layers under 1 µm"},
+ {g:"Electrodes"},
+ {id:"eB",label:"Electrode ASR, conventional cell",min:0.05,max:0.5,step:0.01,fmt:v=>v.toFixed(2)+" Ω·cm²",hint:"At its own temperature"},
+ {id:"e600",label:"Electrode ASR at 600 °C",min:0.05,max:1,step:0.01,fmt:v=>v.toFixed(2)+" Ω·cm²",hint:"With a low-temperature cathode"},
+ {id:"eEa",label:"Electrode activation energy",min:0.5,max:1.5,step:0.05,fmt:v=>v.toFixed(2)+" eV",hint:"How fast electrode loss grows as it cools"},
+ {g:"Value of a cooler stack"},
+ {id:"bop",label:"Balance-of-plant savings",min:0,max:150,step:5,fmt:v=>"$"+v+"/kW per 100 °C",hint:"Heat exchangers, insulation, startup"},
+ {id:"mat",label:"Interconnect and seal savings",min:0,max:200,step:5,fmt:v=>"$"+v+"/kW",hint:"Ferritic steel, simpler seals"},
+ {id:"matT",label:"Interconnect savings start at",min:550,max:750,step:10,fmt:v=>"≤ "+v+" °C",hint:"Material switch threshold"},
+ {g:"Stack life"},
+ {id:"deg",label:"Degradation at conventional temperature",min:0.1,max:2,step:0.05,fmt:v=>v.toFixed(2)+"%/1000 h",hint:"Power loss rate"},
+ {id:"halv",label:"Degradation halves every",min:25,max:200,step:5,fmt:v=>v+" °C cooler",hint:"Placeholder; replace with test data"},
+ {id:"eol",label:"Allowed power loss before replacement",min:5,max:30,step:1,fmt:v=>v+"%",hint:"End-of-life criterion"},
+ {id:"sys",label:"System life",min:20000,max:120000,step:5000,fmt:v=>num(v)+" h ("+(v/8760).toFixed(1)+" yr)",hint:"Hours of operation"},
+ {type:"check",id:"lifeOn",label:"Count stack-life value as customer savings"},
+];
+const GFIELDS=[
+ {g:"Market"},
+ {id:"tam",label:"Total addressable market",min:50,max:20000,step:50,fmt:v=>num(v)+" MW/yr",hint:"SOFC stack capacity shipped per year"},
+ {g:"Goal"},
+ {id:"goal",label:"Annual goal",min:250000,max:100000000,step:250000,fmt:v=>money(v)+"/yr",hint:"Steady-state, at full volume",notag:true},
+];
+const SCN={
+ conservative:{stacks:1000,kw:10,cost:2000,sav:10,comp:40,share:15,var:6,yield:75,fee:50000,capex:1200000,qual:400000,qm:24,ramp:3,fixed:500000},
+ base:{stacks:2000,kw:10,cost:1500,sav:20,comp:50,share:25,var:4,yield:90,fee:150000,capex:750000,qual:250000,qm:18,ramp:2,fixed:400000},
+ optimistic:{stacks:5000,kw:10,cost:1200,sav:40,comp:50,share:30,var:3,yield:95,fee:300000,capex:600000,qual:200000,qm:12,ramp:1,fixed:350000},
+};
+let S=Object.assign({
+  link:true,tam:1000,goal:5000000,
+  T:600,baseT:800,j:0.5,tc:10,tf:1,eB:0.2,e600:0.25,eEa:0.9,
+  bop:40,mat:60,matT:650,deg:0.5,halv:100,eol:10,sys:80000,lifeOn:false
+},SCN.base), model="service", goalType="revenue";
+let tags=store.get("fcet-tags-v2")||{};
+
+function renderInputs(container,fields,state,tagged){
+  container.innerHTML="";
+  fields.forEach(f=>{
+    if(f.g){const d=document.createElement("div");d.className="group-label";d.textContent=f.g;container.appendChild(d);return}
+    const w=document.createElement("div");w.className="field";w.dataset.only=f.only||"";
+    if(f.type==="check"){
+      w.innerHTML=`<label class="check" for="in-${f.id}"><input type="checkbox" id="in-${f.id}" ${state[f.id]?"checked":""}><span>${f.label}</span></label>`;
+      container.appendChild(w);
+      const inp=w.querySelector("input");inp.addEventListener("change",()=>{state[f.id]=inp.checked;renderAll()});return;
+    }
+    const showTag=tagged&&!f.notag, t=tags[f.id]||"illustrative";
+    w.innerHTML=`<div class="field-top"><label for="in-${f.id}">${f.label}</label><span class="val" id="v-${f.id}"></span></div>
+      <input type="range" id="in-${f.id}" min="${f.min}" max="${f.max}" step="${f.step}" value="${state[f.id]}">
+      <div class="field-sub"><span class="hint${f.goal?" goal":""}">${f.hint}</span>${showTag?`<button type="button" class="tag" data-id="${f.id}" data-s="${t}" title="Click to change evidence status">${t}</button>`:""}</div>`;
+    container.appendChild(w);
+    const inp=w.querySelector("input");
+    inp.addEventListener("input",()=>{state[f.id]=parseFloat(inp.value);renderAll()});
+  });
+  if(tagged)container.querySelectorAll(".tag").forEach(b=>b.addEventListener("click",()=>{
+    const order=["illustrative","estimate","sourced"];const n=order[(order.indexOf(b.dataset.s)+1)%3];
+    b.dataset.s=n;b.textContent=n;tags[b.dataset.id]=n;store.set("fcet-tags-v2",tags);coverage();
+  }));
+}
+function syncInputs(fields,state){fields.forEach(f=>{if(f.g)return;const i=$("#in-"+f.id);if(!i)return;
+  if(f.type==="check"){i.checked=!!state[f.id];return}
+  i.value=state[f.id];$("#v-"+f.id).textContent=f.fmt(state[f.id])})}
+function allFields(){return FIELDS.concat(TF,GFIELDS)}
+function coverage(){
+  const ids=allFields().filter(f=>f.id&&f.type!=="check"&&!f.notag&&(!f.only||f.only===model)).map(f=>f.id);
+  let s=0,e=0;ids.forEach(i=>{const t=tags[i]||"illustrative";if(t==="sourced")s++;else if(t==="estimate")e++});
+  $("#covS").style.width=(s/ids.length*100)+"%";$("#covE").style.width=(e/ids.length*100)+"%";
+  $("#covTxt").textContent=`${s} sourced · ${e} est. · ${ids.length-s-e} illus.`;
+}
+
+/* ---------- Temperature physics and value ---------- */
+const MAT={ysz:{s0:0.04,T0:1073.15,Ea:1.0},gdc:{s0:0.025,T0:873.15,Ea:0.7}};
+const kB=8.617e-5, V0=1.0;
+const film=()=>$("#mat").value;
+function sigma(mat,Tc){const m=MAT[mat],T=Tc+273.15;return m.s0*(m.T0/T)*Math.exp(-m.Ea/kB*(1/T-1/m.T0))}
+function asr(mat,um,Tc){return (um*1e-4)/sigma(mat,Tc)}
+function elec(Tc){return S.e600*Math.exp(S.eEa/kB*(1/(Tc+273.15)-1/873.15))}
+function vBase(){return V0-S.j*(asr("ysz",S.tc,S.baseT)+S.eB)}
+function vAt(Tc,um){return V0-S.j*(asr(film(),um,Tc)+elec(Tc))}
+function pdEffect(Tc,um){const vb=vBase(),vt=vAt(Tc,um);return S.cost*(1-vb/Math.max(vt,0.05))}
+function lifeH(Tc){const d=S.deg*Math.pow(0.5,(S.baseT-Tc)/S.halv);return S.eol/d*1000}
+function lifeVal(Tc){const nb=Math.max(1,S.sys/lifeH(S.baseT)),nt=Math.max(1,S.sys/lifeH(Tc));return (nb-nt)*S.cost}
+function tempParts(Tc,um){
+  const bop=S.bop*(S.baseT-Tc)/100;
+  const mat=(Tc<=S.matT&&S.baseT>S.matT)?S.mat:0;
+  const pd=pdEffect(Tc,um), life=lifeVal(Tc);
+  return {bop,mat,pd,life,total:bop+mat+pd+(S.lifeOn?life:0),runs:vAt(Tc,um)>0.05};
+}
+function tempSav(){return S.link?tempParts(S.T,S.tf).total:0}
+function totSav(){return S.sav+tempSav()}
+
+/* ---------- Core economics (per kW) ---------- */
+function perKW(savOverride){
+  const sav=savOverride===undefined?totSav():savOverride;
+  const rev=S.share/100*sav;
+  const cost=model==="service"?S.var/(S.yield/100):0;
+  return {sav,rev,cost,margin:rev-cost,keeps:sav-rev};
+}
+function annualKW(){return S.stacks*S.kw}
+function simulate(){
+  const u=perKW(),M=72,months=[];let cum=0;const vol=annualKW();
+  for(let m=0;m<M;m++){
+    let flow=0,kw=0,rev=0;
+    if(m===0&&model==="service")flow-=S.capex;
+    if(m<S.qm)flow-=S.qual/S.qm;
+    if(model==="license"&&m===S.qm){flow+=S.fee;rev+=S.fee}
+    if(m>=S.qm){const frac=S.ramp===0?1:Math.min(1,(m-S.qm+0.5)/(S.ramp*12));kw=vol/12*frac;rev+=kw*u.rev;flow+=kw*u.margin}
+    flow-=S.fixed/12;cum+=flow;months.push({m,flow,cum,kw,rev});
+  }
+  let trough=0,troughM=0;months.forEach(x=>{if(x.cum<trough){trough=x.cum;troughM=x.m}});
+  let payback=null;for(const x of months){if(x.m>troughM&&x.cum>=0){payback=x.m+1;break}}
+  const years=[];for(let y=0;y<6;y++){const sl=months.slice(y*12,y*12+12);years.push({
+    kw:sl.reduce((a,b)=>a+b.kw,0),rev:sl.reduce((a,b)=>a+b.rev,0),flow:sl.reduce((a,b)=>a+b.flow,0),cum:sl[11].cum})}
+  return {months,years,trough,troughM,payback,u};
+}
+
+/* ---------- Module 1 ---------- */
+function renderEcon(){
+  document.querySelectorAll("#econ-inputs .field").forEach(w=>{w.hidden=!!w.dataset.only&&w.dataset.only!==model});
+  const r=simulate(),u=r.u,vol=annualKW(),ts=tempSav();
+  const net=vol*u.margin-S.fixed;
+  const k=(label,val,sub,cls="")=>`<div class="kpi ${cls}"><span class="k">${label}</span><span class="v ${typeof val==="number"&&val<0?"neg":""}">${typeof val==="number"?money(val):val}</span>${sub?`<span class="s">${sub}</span>`:""}</div>`;
+  $("#kpis").innerHTML=
+    k("FCET revenue per kW",kwm(u.rev),`${pct(u.rev/S.cost)} of stack cost`,"hero")+
+    k("FCET revenue per stack",u.rev*S.kw,`${pct(S.share/100,0)} of customer savings`)+
+    k("FCET revenue per year",vol*u.rev,`${num(S.stacks)} stacks · ${mw(vol)}`)+
+    k("Manufacturer savings per kW",kwm(u.sav),S.link?`direct $${S.sav.toFixed(0)} + temperature $${ts.toFixed(0)}`:`${pct(u.sav/S.cost)} of stack cost`)+
+    k("Manufacturer keeps per year",vol*u.keeps,`${kwm(u.keeps)} · ${money(u.keeps*S.kw)}/stack`)+
+    k("FCET net after fixed cost",net,model==="service"?`margin ${pct(u.margin/u.rev,0)} of revenue`:"royalty, no variable cost");
+  kwChart(u);
+  const row=(l,perkw,cls="")=>`<tr class="${cls}"><td>${l}</td><td>${kwm(perkw)}</td><td>${money(perkw*S.kw)}</td><td>${pct(perkw/S.cost)}</td><td>${pct(u.sav?perkw/u.sav:NaN)}</td><td>${money(perkw*vol)}</td></tr>`;
+  $("#unitTable").innerHTML=`<thead><tr><th></th><th>$/kW</th><th>$/stack</th><th>% of stack cost</th><th>% of total savings</th><th>Per year</th></tr></thead><tbody>
+    ${row("Baseline stack cost",S.cost)}
+    ${row("Total savings with FCET film",u.sav,"em")}
+    ${row("Direct film savings",S.sav,"sub")}
+    ${S.link?row(`Temperature savings at ${S.T} °C`,ts,"sub"):""}
+    ${row("FCET revenue",u.rev,"em")}
+    ${model==="service"?row("FCET variable cost",u.cost):""}
+    ${model==="service"?row("FCET contribution margin",u.margin):""}
+    ${row("Manufacturer keeps",u.keeps)}
+    ${row("Savings with competing approach",S.comp)}
+    ${row("FCET advantage over competing approach",u.sav-S.comp)}
+    ${row("Manufacturer net gain vs competing approach",u.keeps-S.comp)}
+  </tbody>`;
+  const pb=r.payback?`month ${r.payback} (year ${(r.payback/12).toFixed(1)})`:"not within 6 years";
+  const beKW=u.margin>0?S.fixed/u.margin:Infinity;
+  const a=(q,ans)=>`<div class="ans"><span class="q">${q}</span><span class="a">${ans}</span></div>`;
+  const wins=u.keeps>S.comp;
+  $("#answers").innerHTML=
+    a("Why would a manufacturer switch?",wins?`After paying FCET it keeps <b>${kwm(u.keeps)}</b>, which beats the competing approach's <b>${kwm(S.comp)}</b> by <b>${money((u.keeps-S.comp)*vol)}</b> a year.`:`It keeps <b>${kwm(u.keeps)}</b> after paying FCET, <b>less</b> than the competing approach's <b>${kwm(S.comp)}</b>. FCET's share must drop below <b>${pct(1-S.comp/u.sav,0)}</b> to win.`)+
+    a("Smallest investment to reach the first contract?",`<b>${money(-r.trough)}</b> peak funding need, lowest in month ${r.troughM+1}.`)+
+    a("When does FCET pay back the investment?",`Cumulative cash turns positive in <b>${pb}</b>.`)+
+    a("Break-even volume?",isFinite(beKW)?`<b>${mw(beKW)}</b> a year, or <b>${num(Math.ceil(beKW/S.kw))}</b> stacks at ${S.kw} kW.`:`Never at this price: each kW loses money.`);
+  const rows=r.years.map((y,i)=>`<tr><td>Year ${i+1}</td><td>${num(y.kw/S.kw)}</td><td>${mw(y.kw)}</td><td>${money(y.rev)}</td><td class="${y.flow<0?"neg":""}">${money(y.flow)}</td><td class="${y.cum<0?"neg":""}">${money(y.cum)}</td></tr>`).join("");
+  $("#yearTable").innerHTML=`<thead><tr><th>Period</th><th>Stacks</th><th>Capacity</th><th>Revenue</th><th>Net cash flow</th><th>Cumulative</th></tr></thead><tbody>${rows}</tbody>`;
+  cashChart(r);
+}
+
+function kwChart(u){
+  const W=640,H=150,L=150,R=60,rowH=34,T=14;
+  const max=Math.max(u.sav,S.comp,1)*1.05, x=v=>L+Math.max(0,v)/max*(W-L-R);
+  const font=`font-family="IBM Plex Sans,sans-serif" font-size="12"`;
+  let g="";
+  niceTicks(0,max,4).forEach(t=>g+=`<line x1="${x(t)}" x2="${x(t)}" y1="${T-4}" y2="${T+rowH*2+8}" stroke="var(--line)"/><text x="${x(t)}" y="${H-6}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">$${num(t)}</text>`);
+  const y1=T+4,y2=T+rowH+14,bh=24;
+  g+=`<text x="${L-10}" y="${y1+16}" text-anchor="end" ${font} fill="var(--ink)">With FCET film</text>`;
+  let cx=L;
+  [[u.cost,"var(--slate)"],[u.margin,"var(--cobalt)"],[u.keeps,"var(--good)"]].forEach(([v,c])=>{const w=Math.max(0,v/max*(W-L-R));g+=`<rect x="${cx}" y="${y1}" width="${w}" height="${bh}" fill="${c}"/>`;cx+=w});
+  g+=`<text x="${x(u.sav)+6}" y="${y1+16}" font-size="12" fill="var(--ink)" font-family="IBM Plex Mono,monospace">$${num(u.sav)}</text>`;
+  g+=`<text x="${L-10}" y="${y2+16}" text-anchor="end" ${font} fill="var(--ink)">Competing approach</text>`;
+  g+=`<rect x="${L}" y="${y2}" width="${Math.max(0,x(S.comp)-L)}" height="${bh}" fill="var(--ceria)"/>`;
+  g+=`<text x="${x(S.comp)+6}" y="${y2+16}" font-size="12" fill="var(--ink)" font-family="IBM Plex Mono,monospace">$${num(S.comp)}</text>`;
+  g+=`<line x1="${x(S.comp)}" x2="${x(S.comp)}" y1="${y1-4}" y2="${y1+bh+4}" stroke="var(--ceria)" stroke-width="2" stroke-dasharray="3 2"/>`;
+  $("#kwChart").innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Savings per kW split">${g}</svg>`;
+}
+
+function cashChart(r){
+  const W=640,H=230,L=56,R=10,T=12,B=28,pw=W-L-R,ph=H-T-B;
+  const vals=r.months.map(x=>x.cum);let lo=Math.min(0,...vals),hi=Math.max(0,...vals);
+  const pad=(hi-lo)*0.08||1;lo-=pad;hi+=pad;
+  const y=v=>T+(hi-v)/(hi-lo)*ph, x=m=>L+m/72*pw;
+  let g=niceTicks(lo,hi,5).map(t=>`<line x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)"/><text x="${L-6}" y="${y(t)+4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${money(t)}</text>`).join("");
+  for(let yr=0;yr<=6;yr++)g+=`<text x="${x(yr*12)}" y="${H-8}" text-anchor="${yr===0?"start":yr===6?"end":"middle"}" font-size="11" fill="var(--muted)" font-family="IBM Plex Sans,sans-serif">${yr===0?"Start":"Y"+yr}</text>`;
+  const pts=r.months.map(m=>`${x(m.m+1).toFixed(1)},${y(m.cum).toFixed(1)}`).join(" ");
+  const qx=x(S.qm);
+  g+=`<rect x="${L}" y="${T}" width="${Math.max(0,qx-L)}" height="${ph}" fill="var(--ceria-soft)" opacity=".6"/>`;
+  g+=`<text x="${L+6}" y="${T+14}" font-size="11" fill="var(--ceria)" font-family="IBM Plex Sans,sans-serif">Qualification</text>`;
+  g+=`<line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--ink)"/>`;
+  g+=`<polygon points="${x(1)},${y(0)} ${pts} ${x(72)},${y(0)}" fill="var(--cobalt)" opacity=".12"/><polyline points="${pts}" fill="none" stroke="var(--cobalt)" stroke-width="2"/>`;
+  g+=`<circle cx="${x(r.troughM+1)}" cy="${y(r.trough)}" r="4.5" fill="var(--bad)"/>`;
+  g+=`<circle cx="${x(72)}" cy="${y(r.months[71].cum)}" r="3.5" fill="var(--cobalt)"/>`;
+  $("#cashChart").innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Cumulative cash over six years">${g}</svg>`;
+}
+function niceTicks(lo,hi,n){const span=hi-lo;if(span<=0)return[lo];const raw=span/n,mag=Math.pow(10,Math.floor(Math.log10(raw)));const st=[1,2,2.5,5,10].map(s=>s*mag).find(s=>span/s<=n)||mag*10;
+  const out=[];for(let t=Math.ceil(lo/st)*st;t<=hi+1e-9;t+=st)out.push(Math.abs(t)<1e-9?0:t);return out}
+
+/* ---------- Module 2: temperature ---------- */
+// FCET net profit per year at temperature Tc, with temperature savings priced in
+function profitAt(Tc){const u=perKW(S.sav+tempParts(Tc,S.tf).total);return annualKW()*u.margin-S.fixed}
+function renderTemp(){
+  const mat=film(),T=S.T,tp=tempParts(T,S.tf),cp=tempParts(T,S.tc),vol=annualKW(),sh=S.share/100,u=perKW();
+  const aF=asr(mat,S.tf,T), inBand=T>=550&&T<=650;
+  const k=(l,v,sub,cls="")=>`<div class="kpi ${cls}"><span class="k">${l}</span><span class="v">${v}</span>${sub?`<span class="s">${sub}</span>`:""}</div>`;
+  const tempRev=sh*tp.total;
+  $("#tkpis").innerHTML=
+    k(`Temperature savings at ${T} °C`,`<span class="${tp.total<0?"neg":""}">${kwm(tp.total)}</span>`,`${money(tp.total*S.kw)} per stack · ${pct(tp.total/S.cost)} of stack cost`,"hero")+
+    k("Customer savings per year",`<span class="${tp.total<0?"neg":""}">${money(tp.total*vol)}</span>`,`${num(S.stacks)} stacks · ${inBand?"inside":"outside"} goal band`)+
+    k("FCET revenue from cooler stacks",`<span class="${tempRev<0?"neg":""}">${kwm(tempRev)}</span>`,S.link?`${money(tempRev*vol)}/yr · ${pct(u.rev>0?tempRev/u.rev:NaN,0)} of FCET revenue`:`${money(tempRev*vol)}/yr · not counted in Module 1`)+
+    k("Penalty avoided vs tape-cast",`<span class="pos">${kwm(tp.pd-cp.pd)}</span>`,`${money((tp.pd-cp.pd)*vol)}/yr the thin film makes possible`)+
+    k("Film electrolyte ASR",aF.toFixed(3)+" Ω·cm²",aF<=0.15?"meets 0.15 Ω·cm² target":"misses 0.15 Ω·cm² target")+
+    k(`Stack life at ${T} °C`,num(lifeH(T))+" h",`vs ${num(lifeH(S.baseT))} h · ${kwm(tp.life)} ${S.lifeOn?"counted":"not counted"}`);
+
+  // Goal-band summary
+  const band=[];for(let t=550;t<=650;t+=10)band.push({t,p:tempParts(t,S.tf),c:tempParts(t,S.tc),prof:profitAt(t)});
+  const lo=band.reduce((a,b)=>b.p.total<a.p.total?b:a),hi=band.reduce((a,b)=>b.p.total>a.p.total?b:a);
+  const pLo=band.reduce((a,b)=>b.prof<a.prof?b:a),pHi=band.reduce((a,b)=>b.prof>a.prof?b:a);
+  const a550=asr(mat,S.tf,550),e550=elec(550),a650=asr(mat,S.tf,650);
+  const allMeet=a550<=0.15;
+  const chip=(st,txt)=>`<span class="chip ${st}">${txt}</span>`;
+  const card=(q,st,txt,body)=>`<div class="ans"><div class="cond-head"><span class="q">${q}</span>${st?chip(st,txt):""}</div><span class="a">${body}</span></div>`;
+  $("#tanswers").innerHTML=
+    card("Customer savings across 550–650 °C",lo.p.total>0?"met":"gap",lo.p.total>0?"Positive":"Mixed",
+      `<b>${kwm(lo.p.total)}</b> to <b>${kwm(hi.p.total)}</b>, or <b>${money(lo.p.total*vol)}</b> to <b>${money(hi.p.total*vol)}</b> a year across ${num(S.stacks)} stacks.`)+
+    card("FCET profit across 550–650 °C",pLo.prof>0?"met":pHi.prof>0?"gap":"no",pLo.prof>0?"Profitable":pHi.prof>0?"Partly":"Loss",
+      `<b>${money(pLo.prof)}</b> to <b>${money(pHi.prof)}</b> net per year after fixed cost, best at <b>${pHi.t} °C</b>.`)+
+    card("Can the film electrolyte run in the band?",allMeet?"met":a650<=0.15?"gap":"no",allMeet?"Yes":a650<=0.15?"Upper band":"No",
+      `Film ASR is <b>${a650.toFixed(3)}</b> Ω·cm² at 650 °C and <b>${a550.toFixed(3)}</b> at 550 °C. Tape-cast at 600 °C is <b>${asr(mat,S.tc,600).toFixed(3)}</b>.`)+
+    card("What limits it at the cold end?",e550>a550*3?"gap":"met",e550>a550*3?"Electrodes":"Balanced",
+      `At 550 °C the electrodes add <b>${e550.toFixed(2)}</b> Ω·cm², ${(e550/a550).toFixed(1)}× the film. ${e550>a550*3?"A low-temperature cathode is the next condition to meet.":"Electrolyte and electrodes are in balance."}`);
+
+  // Band table
+  let cols=[550,600,650];if(!cols.includes(T))cols.push(T);cols.sort((a,b)=>a-b);
+  const C=cols.map(t=>({t,p:tempParts(t,S.tf),c:tempParts(t,S.tc)}));
+  const cell=v=>`<td class="${v<0?"neg":""}">${kwm(v)}</td>`;
+  const yr=v=>`<td class="${v<0?"neg":""}">${money(v)}</td>`;
+  let h=`<thead><tr><th></th>${C.map(c=>`<th class="${c.t>=550&&c.t<=650?"band":""}">${c.t} °C${c.t===T?" ◆":""}</th>`).join("")}</tr></thead><tbody>`;
+  h+=`<tr class="sub"><td>Balance of plant</td>${C.map(c=>cell(c.p.bop)).join("")}</tr>`;
+  h+=`<tr class="sub"><td>Interconnects and seals</td>${C.map(c=>cell(c.p.mat)).join("")}</tr>`;
+  h+=`<tr class="sub"><td>Power-density effect</td>${C.map(c=>cell(c.p.pd)).join("")}</tr>`;
+  h+=`<tr class="sub"><td>Stack life ${S.lifeOn?"(counted)":"(not counted)"}</td>${C.map(c=>cell(c.p.life)).join("")}</tr>`;
+  h+=`<tr class="em"><td>Temperature savings, $/kW</td>${C.map(c=>cell(c.p.total)).join("")}</tr>`;
+  h+=`<tr><td>Same temperature, tape-cast</td>${C.map(c=>cell(c.c.total)).join("")}</tr>`;
+  h+=`<tr><td>Total savings incl. direct, $/kW</td>${C.map(c=>cell(S.sav+c.p.total)).join("")}</tr>`;
+  h+=`<tr><td>Total savings, $/stack</td>${C.map(c=>yr((S.sav+c.p.total)*S.kw)).join("")}</tr>`;
+  h+=`<tr><td>Customer savings per year</td>${C.map(c=>yr((S.sav+c.p.total)*vol)).join("")}</tr>`;
+  h+=`<tr class="em"><td>FCET revenue, $/kW</td>${C.map(c=>cell(perKW(S.sav+c.p.total).rev)).join("")}</tr>`;
+  h+=`<tr><td>FCET revenue per year</td>${C.map(c=>yr(perKW(S.sav+c.p.total).rev*vol)).join("")}</tr>`;
+  h+=`<tr class="em"><td>FCET net profit per year</td>${C.map(c=>yr(profitAt(c.t))).join("")}</tr>`;
+  h+=`<tr><td>Manufacturer keeps per year</td>${C.map(c=>yr(perKW(S.sav+c.p.total).keeps*vol)).join("")}</tr>`;
+  h+=`<tr><td>Film electrolyte ASR, Ω·cm²</td>${C.map(c=>`<td class="${asr(mat,S.tf,c.t)<=0.15?"pos":"neg"}">${asr(mat,S.tf,c.t).toFixed(3)}</td>`).join("")}</tr>`;
+  $("#bandTable").innerHTML=h+"</tbody>";
+
+  sweepChart();
+
+  // Physics KPIs
+  const ac=asr(mat,S.tc,T),refA=asr("ysz",S.tc,S.baseT);
+  let match=null;for(let t=900;t>=400;t-=1){if(asr(mat,S.tf,t)>refA){match=t+1;break}}
+  const kp=(l,v,cls="")=>`<div class="kpi ${cls}"><span class="k">${l}</span><span class="v">${v}</span></div>`;
+  $("#pkpis").innerHTML=
+    kp(`Tape-cast ASR at ${T} °C`,ac.toFixed(3)+" Ω·cm²")+kp(`Film ASR at ${T} °C`,aF.toFixed(3)+" Ω·cm²","hero")+
+    kp("Ohmic resistance cut",((1-aF/ac)*100).toFixed(0)+"%")+kp("Cell voltage, conventional",vBase().toFixed(3)+" V")+
+    kp(`Cell voltage, film at ${T} °C`,`<span class="${vAt(T,S.tf)<vBase()?"neg":"pos"}">${Math.max(0,vAt(T,S.tf)).toFixed(3)} V</span>`)+
+    kp(`Film matches YSZ ${S.tc} µm at ${S.baseT} °C`,match?"at "+match+" °C":"below 400 °C");
+  asrChart(mat);
+}
+
+function sweepChart(){
+  const W=640,H=270,L=62,R=14,T=22,B=30,pw=W-L-R,ph=H-T-B,t0=450,t1=850;
+  const pts=[];for(let t=t0;t<=t1;t+=5){const p=tempParts(t,S.tf),c=tempParts(t,S.tc);pts.push({t,a:p.total,b:c.total,r:S.share/100*p.total})}
+  let hi=Math.max(10,...pts.map(p=>Math.max(p.a,p.r)))*1.12;
+  let lo=Math.min(0,...pts.map(p=>Math.min(p.a,p.b,p.r)));lo=Math.max(lo,-hi*0.9);lo=lo<0?lo*1.1:0;
+  const x=t=>L+(t-t0)/(t1-t0)*pw, y=v=>T+(hi-Math.max(lo,Math.min(hi,v)))/(hi-lo)*ph;
+  let g=`<rect x="${x(550)}" y="${T}" width="${x(650)-x(550)}" height="${ph}" fill="var(--ceria-soft)"/>`;
+  g+=`<text x="${(x(550)+x(650))/2}" y="${T-8}" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ceria)" font-family="IBM Plex Sans,sans-serif">Goal 550–650 °C</text>`;
+  niceTicks(lo,hi,5).forEach(t=>g+=`<line x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)"/><text x="${L-6}" y="${y(t)+4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${t<0?"−":""}$${num(Math.abs(t))}</text>`);
+  for(let t=450;t<=850;t+=50)g+=`<text x="${x(t)}" y="${H-10}" text-anchor="${t===450?"start":t===850?"end":"middle"}" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${t}°C</text>`;
+  g+=`<line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--ink)" stroke-opacity=".6"/>`;
+  if(S.baseT>=t0&&S.baseT<=t1)g+=`<line x1="${x(S.baseT)}" x2="${x(S.baseT)}" y1="${T}" y2="${T+ph}" stroke="var(--muted)" stroke-dasharray="3 3"/><text x="${x(S.baseT)-4}" y="${T+12}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Sans,sans-serif">Conventional ${S.baseT} °C</text>`;
+  const line=(key,col,w,dash)=>`<polyline points="${pts.map(p=>`${x(p.t).toFixed(1)},${y(p[key]).toFixed(1)}`).join(" ")}" fill="none" stroke="${col}" stroke-width="${w}" ${dash?`stroke-dasharray="${dash}"`:""}/>`;
+  g+=line("b","var(--slate)",1.75);
+  g+=line("r","var(--good)",2,"5 3");
+  g+=line("a","var(--cobalt)",2.5);
+  const cur=tempParts(S.T,S.tf).total;
+  g+=`<circle cx="${x(S.T)}" cy="${y(cur)}" r="5" fill="var(--cobalt)" stroke="var(--panel)" stroke-width="2"/>`;
+  g+=`<text x="${x(S.T)+(S.T>760?-8:8)}" y="${y(cur)-9}" text-anchor="${S.T>760?"end":"start"}" font-size="11" fill="var(--ink)" font-family="IBM Plex Mono,monospace">${kwm(cur)} at ${S.T} °C</text>`;
+  if(pts.some(p=>p.b<lo))g+=`<text x="${L+6}" y="${T+ph-6}" font-size="11" fill="var(--muted)" font-family="IBM Plex Sans,sans-serif">Tape-cast penalty runs off the chart at low temperature</text>`;
+  $("#sweepChart").innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Savings per kW versus operating temperature">${g}</svg>`;
+}
+
+function asrChart(mat){
+  const W=640,H=240,L=56,R=12,T=12,B=30,pw=W-L-R,ph=H-T-B,t0=450,t1=900;
+  const lo=Math.log10(0.001),hi=Math.log10(20);
+  const x=t=>L+(t-t0)/(t1-t0)*pw, y=v=>T+(hi-Math.log10(Math.min(Math.max(v,0.001),20)))/(hi-lo)*ph;
+  let g=`<rect x="${x(550)}" y="${T}" width="${x(650)-x(550)}" height="${ph}" fill="var(--ceria-soft)" opacity=".7"/>`;
+  [0.001,0.01,0.1,1,10].forEach(v=>g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${v}</text>`);
+  for(let t=450;t<=900;t+=75)g+=`<text x="${x(t)}" y="${H-10}" text-anchor="${t===450?"start":t===900?"end":"middle"}" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${t}°C</text>`;
+  const line=f=>{let p=[];for(let t=t0;t<=t1;t+=5)p.push(`${x(t).toFixed(1)},${y(f(t)).toFixed(1)}`);return p.join(" ")};
+  g+=`<line x1="${L}" x2="${W-R}" y1="${y(0.15)}" y2="${y(0.15)}" stroke="var(--ceria)" stroke-dasharray="5 4" stroke-width="1.5"/>`;
+  g+=`<polyline points="${line(t=>elec(t))}" fill="none" stroke="var(--bad)" stroke-width="1.75" stroke-dasharray="4 3"/>`;
+  g+=`<polyline points="${line(t=>asr(mat,S.tc,t))}" fill="none" stroke="var(--slate)" stroke-width="2"/>`;
+  g+=`<polyline points="${line(t=>asr(mat,S.tf,t))}" fill="none" stroke="var(--cobalt)" stroke-width="2.5"/>`;
+  g+=`<line x1="${x(S.T)}" x2="${x(S.T)}" y1="${T}" y2="${T+ph}" stroke="var(--ink)" stroke-opacity=".35" stroke-dasharray="2 3"/>`;
+  g+=`<circle cx="${x(S.T)}" cy="${y(asr(mat,S.tc,S.T))}" r="4" fill="var(--slate)"/><circle cx="${x(S.T)}" cy="${y(asr(mat,S.tf,S.T))}" r="4.5" fill="var(--cobalt)"/>`;
+  $("#asrChart").innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="ASR versus temperature">${g}</svg>`;
+}
+
+/* ---------- Module 3: goal solver ---------- */
+function achieved(kw,sh,sav){const rev=kw*sh*sav;if(goalType==="revenue")return rev;const c=model==="service"?S.var/(S.yield/100):0;return rev-kw*c-S.fixed}
+function renderGoal(){
+  const vol=annualKW(),tamKW=S.tam*1000,sh=S.share/100,u=perKW(),sav=u.sav;
+  const now=achieved(vol,sh,sav),G=S.goal,c=u.cost,fixedAdd=goalType==="net"?S.fixed:0;
+  const tamSpend=tamKW*S.cost, tamSav=tamKW*sav;
+  const label=goalType==="revenue"?"revenue":"net profit";
+  const k=(l,v,sub,cls="")=>`<div class="kpi ${cls}"><span class="k">${l}</span><span class="v">${v}</span>${sub?`<span class="s">${sub}</span>`:""}</div>`;
+  $("#gkpis").innerHTML=
+    k(`Projected ${label}`,`<span class="${now<0?"neg":""}">${money(now)}</span>`,`${pct(now/G,0)} of goal`,"hero")+
+    k("Current market share",pct(vol/tamKW,2),`${mw(vol)} of ${mw(tamKW)}`)+
+    k("FCET revenue share of TAM",pct(vol*u.rev/tamSpend,3),`of ${money(tamSpend)} stack spend`)+
+    k("Goal as % of TAM stack spend",pct(G/tamSpend,2),`TAM stack spend ${money(tamSpend)}/yr`)+
+    k("Goal as % of TAM savings pool",pct(G/tamSav,1),`pool = TAM × ${kwm(sav)}`)+
+    k("FCET take of TAM if 100% adoption",money(tamKW*u.rev),"ceiling at current price");
+
+  const conds=[];
+  const reqKW=(G+fixedAdd)/(sh*sav-c);
+  conds.push({q:"Volume needed",
+    v:reqKW>0&&isFinite(reqKW)?`<b>${mw(reqKW)}</b>/yr = <b>${num(Math.ceil(reqKW/S.kw))}</b> stacks = <b>${pct(reqKW/tamKW,1)}</b> of TAM`:"Not reachable: each kW loses money",
+    st:!(reqKW>0&&isFinite(reqKW))||reqKW>tamKW?"no":vol>=reqKW?"met":"gap",
+    gap:reqKW>0&&isFinite(reqKW)?`${(reqKW/vol).toFixed(1)}× today`:""});
+  const reqSh=(G+fixedAdd+vol*c)/(vol*sav);
+  conds.push({q:"FCET share of savings needed",
+    v:sav>0?`<b>${pct(reqSh,1)}</b> of savings = <b>${kwm(reqSh*sav)}</b> = <b>${pct(reqSh*sav/S.cost,1)}</b> of stack cost`:"No savings to share",
+    st:sav<=0||reqSh>1?"no":(reqSh*sav>sav-S.comp?"gap":sh>=reqSh?"met":"gap"),
+    gap:sav<=0||reqSh>1?"exceeds 100%":reqSh*sav>sav-S.comp?"customer would prefer competitor":`today ${S.share}%`});
+  const reqSav=(G+fixedAdd+vol*c)/(vol*sh);
+  conds.push({q:"Total savings per kW needed",
+    v:`<b>${kwm(reqSav)}</b> = <b>${pct(reqSav/S.cost,1)}</b> of stack cost. Today: direct <b>$${S.sav.toFixed(0)}</b> + temperature <b>$${tempSav().toFixed(0)}</b>.`,
+    st:reqSav>S.cost?"no":sav>=reqSav?"met":"gap",
+    gap:reqSav>S.cost?"exceeds full stack cost":`today ${kwm(sav)}`});
+  // temperature needed: scan 450..850 for the warmest temperature that meets goal
+  let tNeed=null;for(let t=850;t>=450;t-=10){if(achieved(vol,sh,S.sav+tempParts(t,S.tf).total)>=G){tNeed=t;break}}
+  conds.push({q:"Operating temperature needed",
+    v:tNeed!==null?`At current volume and share, running at <b>${tNeed} °C</b> or cooler reaches the goal${tNeed>=550&&tNeed<=650?", inside the goal band":""}.`:`No temperature from 450–850 °C reaches it at current volume and share.`,
+    st:tNeed===null?"no":(S.link&&S.T<=tNeed)?"met":"gap",
+    gap:tNeed===null?"needs volume or share":S.link?`today ${S.T} °C`:"temperature savings not linked"});
+  const ceiling=achieved(tamKW,sh,sav);
+  conds.push({q:"Is the goal inside the TAM at today's price?",
+    v:ceiling>=G?`Yes. Capturing <b>${pct(reqKW/tamKW,1)}</b> of the market reaches it; 100% adoption would give <b>${money(ceiling)}</b>.`:`No. Even 100% of the TAM gives only <b>${money(ceiling)}</b>. Raise savings per kW, FCET's share, or the TAM.`,
+    st:ceiling>=G?(reqKW/tamKW<=0.2?"met":"gap"):"no",
+    gap:ceiling>=G?(reqKW/tamKW<=0.2?"plausible share":"large share"):"outside TAM"});
+  const chipTxt={met:"Met",gap:"Not yet",no:"Not feasible"};
+  $("#conditions").innerHTML=conds.map(c=>`<div class="ans"><div class="cond-head"><span class="q">${c.q}</span><span class="chip ${c.st}">${chipTxt[c.st]}</span></div><span class="a">${c.v}</span>${c.gap?`<span class="hint">${c.gap}</span>`:""}</div>`).join("");
+
+  reqChart(tamKW,vol,sav);
+  heat(tamKW,vol,sav);
+}
+
+function reqShareOfTAM(shFrac,sav,tamKW){const c=model==="service"?S.var/(S.yield/100):0;const per=shFrac*sav-c;if(per<=0)return Infinity;return ((S.goal+(goalType==="net"?S.fixed:0))/per)/tamKW}
+function reqChart(tamKW,vol,sav){
+  const W=640,H=250,L=48,R=14,T=14,B=34,pw=W-L-R,ph=H-T-B,x0=5,x1=60;
+  const cur=vol/tamKW;
+  let ymax=0.25;[0.5,1,1.5].forEach(f=>{for(let s=x0;s<=x1;s++){const v=reqShareOfTAM(s/100,sav*f,tamKW);if(isFinite(v)&&v<=1)ymax=Math.max(ymax,Math.min(v,1))}});
+  ymax=Math.max(ymax,cur*1.2);ymax=Math.min(1,Math.ceil(ymax*20)/20)||1;
+  const x=s=>L+(s-x0)/(x1-x0)*pw, y=v=>T+(1-Math.min(v,ymax)/ymax)*ph;
+  let g="";
+  niceTicks(0,ymax,5).forEach(t=>g+=`<line x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)"/><text x="${L-6}" y="${y(t)+4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${(t*100).toFixed(t*100%1?1:0)}%</text>`);
+  [5,15,25,35,45,60].forEach(s=>g+=`<text x="${x(s)}" y="${H-16}" text-anchor="${s===5?"start":s===60?"end":"middle"}" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${s}%</text>`);
+  g+=`<text x="${L+pw/2}" y="${H-2}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="IBM Plex Sans,sans-serif">FCET share of customer savings</text>`;
+  g+=`<line x1="${L}" x2="${W-R}" y1="${y(cur)}" y2="${y(cur)}" stroke="var(--ceria)" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+  [[0.5,"var(--slate)"],[1,"var(--cobalt)"],[1.5,"var(--good)"]].forEach(([f,col])=>{
+    let segs=[],c2=[];for(let s=x0;s<=x1;s+=0.5){const v=reqShareOfTAM(s/100,sav*f,tamKW);if(isFinite(v)&&v<=ymax){c2.push(`${x(s).toFixed(1)},${y(v).toFixed(1)}`)}else if(c2.length){segs.push(c2);c2=[]}}
+    if(c2.length)segs.push(c2);
+    segs.forEach(p=>g+=`<polyline points="${p.join(" ")}" fill="none" stroke="${col}" stroke-width="${f===1?2.5:1.75}"/>`);
+  });
+  const here=reqShareOfTAM(S.share/100,sav,tamKW);
+  if(isFinite(here)&&here<=ymax)g+=`<circle cx="${x(S.share)}" cy="${y(here)}" r="5" fill="var(--cobalt)" stroke="var(--panel)" stroke-width="2"/><text x="${x(S.share)+(S.share>48?-8:8)}" y="${y(here)-8}" text-anchor="${S.share>48?"end":"start"}" font-size="11" fill="var(--ink)" font-family="IBM Plex Mono,monospace">${pct(here,1)} needed</text>`;
+  else g+=`<text x="${L+pw/2}" y="${T+14}" text-anchor="middle" font-size="11" fill="var(--bad)" font-family="IBM Plex Sans,sans-serif">Goal needs more than ${(ymax*100).toFixed(0)}% of TAM at current inputs</text>`;
+  $("#reqChart").innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Required market share by share of savings">${g}</svg>`;
+}
+
+function heat(tamKW,vol,sav){
+  const shares=[10,15,20,25,30,40,50], mkt=[0.5,1,2,5,10,15,20,30];
+  const curM=vol/tamKW*100;
+  const nearest=(arr,v)=>arr.reduce((a,b)=>Math.abs(b-v)<Math.abs(a-v)?b:a);
+  const nS=nearest(shares,S.share), nM=nearest(mkt,curM);
+  let h=`<thead><tr><th>Share of savings ↓ · Market share →</th>${mkt.map(m=>`<th>${m}%</th>`).join("")}</tr></thead><tbody>`;
+  shares.forEach(s=>{
+    h+=`<tr><td>${s}%</td>`;
+    mkt.forEach(m=>{const v=achieved(tamKW*m/100,s/100,sav);const cls=v>=S.goal?"met":v>=S.goal*0.5?"near":"miss";
+      h+=`<td class="${cls}${s===nS&&m===nM?" here":""}">${money(v)}</td>`});
+    h+=`</tr>`;
+  });
+  $("#heat").innerHTML=h+"</tbody>";
+}
+
+/* ---------- Wiring ---------- */
+function renderAll(){
+  syncInputs(FIELDS,S);syncInputs(TF,S);syncInputs(GFIELDS,S);
+  renderTemp();renderEcon();renderGoal();coverage();
+}
+renderInputs($("#econ-inputs"),FIELDS,S,true);
+renderInputs($("#temp-inputs"),TF,S,true);
+renderInputs($("#goal-inputs"),GFIELDS,S,true);
+document.querySelectorAll("[data-scn]").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("[data-scn]").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  Object.assign(S,SCN[b.dataset.scn]);renderAll()}));
+document.querySelectorAll("[data-model]").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("[data-model]").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  model=b.dataset.model;renderAll()}));
+document.querySelectorAll("[data-goal]").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("[data-goal]").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  goalType=b.dataset.goal;renderAll()}));
+$("#mat").addEventListener("change",renderAll);
+$("#copyBtn").addEventListener("click",()=>{
+  const r=simulate(),u=r.u,vol=annualKW(),tamKW=S.tam*1000,tp=tempParts(S.T,S.tf);
+  const lines=["FCET Value Simulator — "+(model==="service"?"Coating service":"Licensing")+" model",""];
+  allFields().forEach(f=>{if(f.id&&(!f.only||f.only===model)){
+    if(f.type==="check")lines.push(`${f.label}: ${S[f.id]?"yes":"no"}`);
+    else lines.push(`${f.label}: ${f.fmt(S[f.id])}${f.notag?"":" ["+(tags[f.id]||"illustrative")+"]"}`)}});
+  lines.push(`FCET film material: ${film().toUpperCase()}`,"",
+    `Temperature savings at ${S.T} °C: ${kwm(tp.total)} (BoP ${kwm(tp.bop)}, interconnects ${kwm(tp.mat)}, power density ${kwm(tp.pd)}, stack life ${kwm(tp.life)}${S.lifeOn?"":" not counted"})`,
+    `Total customer savings: ${kwm(u.sav)}, ${money(u.sav*S.kw)}/stack, ${money(u.sav*vol)}/yr`,
+    `FCET revenue: ${kwm(u.rev)}, ${money(u.rev*S.kw)}/stack, ${money(u.rev*vol)}/yr (${pct(u.rev/S.cost)} of stack cost)`,
+    `FCET net profit at 550 / 600 / 650 °C: ${money(profitAt(550))} / ${money(profitAt(600))} / ${money(profitAt(650))}`,
+    `Manufacturer keeps: ${kwm(u.keeps)} vs competing approach ${kwm(S.comp)}`,
+    `Market share: ${pct(vol/tamKW,2)} of ${mw(tamKW)}`,
+    `Projected ${goalType==="revenue"?"revenue":"net profit"}: ${money(achieved(vol,S.share/100,u.sav))} vs goal ${money(S.goal)}`,
+    `Peak funding need: ${money(-r.trough)}; payback: ${r.payback?"month "+r.payback:"beyond 6 years"}`);
+  const txt=lines.join("\n"),btn=$("#copyBtn");
+  const fallback=()=>{const ta=$("#copyfallback");ta.value=txt;ta.hidden=false;ta.select();btn.textContent="Select and copy the text below"};
+  try{navigator.clipboard.writeText(txt).then(()=>{btn.textContent="Copied";setTimeout(()=>btn.textContent="Copy assumptions and results",1800)},fallback)}catch(e){fallback()}
+});
+renderAll();
+})();
+</script>
